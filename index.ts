@@ -1,29 +1,16 @@
-type Quadrants<T> = {
-  nw: T;
-  ne: T;
-  sw: T;
-  se: T;
-};
+type Quadrants<T> = { nw: T; ne: T; sw: T; se: T };
 
-class HashCommon {
+abstract class BaseNode<Data> {
+  nw: Data;
+  ne: Data;
+  sw: Data;
+  se: Data;
   level: number;
   hash: string;
-
-  constructor(level: number, hash: string) {
+  result?: BaseNode<Data>;
+  constructor(level: number, hash: string, quadrants: Quadrants<Data>) {
     this.level = level;
     this.hash = hash;
-  }
-}
-
-class HashLeaf extends HashCommon {
-  nw: boolean;
-  ne: boolean;
-  sw: boolean;
-  se: boolean;
-  result?: HashLeaf;
-
-  constructor(quadrants: Quadrants<boolean>) {
-    super(0, hashKey(quadrants));
     this.nw = quadrants.nw;
     this.ne = quadrants.ne;
     this.sw = quadrants.sw;
@@ -31,122 +18,86 @@ class HashLeaf extends HashCommon {
   }
 }
 
-class HashNode extends HashCommon {
-  nw: HashNode;
-  ne: HashNode;
-  sw: HashNode;
-  se: HashNode;
-  result?: HashNode;
-
+class HashNode extends BaseNode<HashNode> {
   constructor(quadrants: Quadrants<HashNode>) {
-    super(quadrants.nw.level + 1, hashKey(quadrants));
-    this.nw = quadrants.nw;
-    this.ne = quadrants.ne;
-    this.sw = quadrants.sw;
-    this.se = quadrants.se;
+    super(quadrants.nw.level + 1, hashKey(quadrants), quadrants);
   }
 }
 
-function hashKey(quadrants: Quadrants<HashNode> | Quadrants<boolean>) {
-  if (isLeaf(quadrants)) {
-    const stateToString = (val: boolean) => (val ? "1" : "0");
-
-    return [
-      stateToString(quadrants.nw),
-      stateToString(quadrants.ne),
-      stateToString(quadrants.sw),
-      stateToString(quadrants.se),
-    ].join("");
+class HashLeaf extends BaseNode<boolean> {
+  constructor(quadrants: Quadrants<boolean>) {
+    super(0, hashKey(quadrants), quadrants);
   }
-
-  return `${quadrants.nw.hash}-${quadrants.ne.hash}-${quadrants.sw.hash}-${quadrants.se.hash}`;
 }
 
-function isLeaf(
-  quadrants: Quadrants<HashNode> | Quadrants<boolean>
-): quadrants is Quadrants<boolean> {
-  return typeof quadrants.nw === "boolean";
+function hashKey(q: Quadrants<HashNode> | Quadrants<boolean>) {
+  if (typeof q.nw === "boolean") {
+    return [q.nw, q.ne, q.sw, q.se].map((v) => (v ? "1" : "0")).join("");
+  }
+
+  return [q.nw.hash, q.ne.hash, q.sw.hash, q.se.hash].join("-");
 }
 
 export class World {
-  nodeCache: Map<string, HashNode | HashLeaf> = new Map();
+  nodeCache = new Map<string, HashNode | HashLeaf>();
 
-  createNode(quadrants: Quadrants<HashNode>): HashNode {
-    const key = hashKey(quadrants);
+  createLeaf(q: Quadrants<boolean>): HashLeaf {
+    const key = hashKey(q);
+    if (this.nodeCache.has(key)) return this.nodeCache.get(key) as HashLeaf;
+    const leaf = new HashLeaf(q);
+    this.nodeCache.set(key, leaf);
 
-    if (this.nodeCache.has(key)) {
-      return this.nodeCache.get(key) as HashNode;
-    }
+    return leaf;
+  }
 
-    const node = new HashNode(quadrants);
+  createNode(q: Quadrants<HashNode>): HashNode {
+    const key = hashKey(q);
+    if (this.nodeCache.has(key)) return this.nodeCache.get(key) as HashNode;
+    const node = new HashNode(q);
     this.nodeCache.set(key, node);
 
     return node;
   }
 
-  createLeaf(quadrants: Quadrants<boolean>): HashLeaf {
-    const key = hashKey(quadrants);
+  evolve(node: HashNode | HashLeaf): HashNode | HashLeaf {
+    if (node instanceof HashLeaf) return this.evolveLeaf(node);
+    if (node.result) return node.result;
 
-    if (this.nodeCache.has(key)) {
-      return this.nodeCache.get(key) as HashLeaf;
-    }
+    const { nw, ne, sw, se } = node as HashNode;
 
-    const node = new HashLeaf(quadrants);
-    this.nodeCache.set(key, node);
+    // recurse
+    const a = this.createNode({ nw: nw.nw, ne: nw.ne, sw: nw.sw, se: nw.se });
+    const b = this.createNode({ nw: ne.nw, ne: ne.ne, sw: ne.sw, se: ne.se });
+    const c = this.createNode({ nw: sw.nw, ne: sw.ne, sw: sw.sw, se: sw.se });
+    const d = this.createNode({ nw: se.nw, ne: se.ne, sw: se.sw, se: se.se });
 
-    return node;
-  }
-
-  evolve<T extends HashNode | HashLeaf>(node: T): T {
-    if (node instanceof HashLeaf) {
-      return this.evolveLeaf(node) as T;
-    }
-
-    if (node.result) return node.result as T;
-
-    const { nw, ne, sw, se } = node;
-    const n00 = nw.nw;
-    const n01 = nw.ne;
-    const n02 = ne.nw;
-    const n10 = nw.sw;
-    const n11 = nw.se;
-    const n12 = ne.sw;
-    const n20 = sw.nw;
-    const n21 = sw.ne;
-    const n22 = se.nw;
-
-    const a = this.createNode({ nw: n00, ne: n01, sw: n10, se: n11 });
-    const b = this.createNode({ nw: n01, ne: n02, sw: n11, se: n12 });
-    const c = this.createNode({ nw: n10, ne: n11, sw: n20, se: n21 });
-    const d = this.createNode({ nw: n11, ne: n12, sw: n21, se: n22 });
-
-    const eA = this.evolve(a);
-    const eB = this.evolve(b);
-    const eC = this.evolve(c);
-    const eD = this.evolve(d);
-
-    const result = this.createNode({ nw: eA, ne: eB, sw: eC, se: eD });
+    const result = this.createNode({
+      nw: this.evolve(a) as HashNode,
+      ne: this.evolve(b) as HashNode,
+      sw: this.evolve(c) as HashNode,
+      se: this.evolve(d) as HashNode,
+    });
 
     node.result = result;
-
-    return result as T;
+    return result;
   }
 
   evolveLeaf(node: HashLeaf): HashLeaf {
-    const cells: number[][] = [
+    const cells = [
       [0, 0, 0, 0],
       [0, node.nw ? 1 : 0, node.ne ? 1 : 0, 0],
       [0, node.sw ? 1 : 0, node.se ? 1 : 0, 0],
       [0, 0, 0, 0],
     ];
-    const nextCells = [
+
+    const next = [
       [false, false],
       [false, false],
     ];
 
     for (let y = 1; y <= 2; y++) {
       for (let x = 1; x <= 2; x++) {
-        const aliveNeighbors =
+        const n =
           cells[y - 1][x - 1] +
           cells[y - 1][x] +
           cells[y - 1][x + 1] +
@@ -155,18 +106,17 @@ export class World {
           cells[y + 1][x - 1] +
           cells[y + 1][x] +
           cells[y + 1][x + 1];
-        const isAlive = cells[y][x] === 1;
-        const nextState =
-          aliveNeighbors === 3 || (isAlive && aliveNeighbors === 2);
-        nextCells[y - 1][x - 1] = nextState;
+        const alive = cells[y][x] === 1;
+        const nextState = n === 3 || (alive && n === 2);
+        next[y - 1][x - 1] = nextState;
       }
     }
 
     return this.createLeaf({
-      nw: nextCells[0][0],
-      ne: nextCells[0][1],
-      sw: nextCells[1][0],
-      se: nextCells[1][1],
+      nw: next[0][0],
+      ne: next[0][1],
+      sw: next[1][0],
+      se: next[1][1],
     });
   }
 }
