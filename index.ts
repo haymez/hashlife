@@ -12,7 +12,7 @@ export type Node = {
   se: Node;
   level: number;
   hash: string;
-  result?: Node;
+  result?: Node | LeafNode;
 };
 
 export type LeafNode = {
@@ -22,8 +22,10 @@ export type LeafNode = {
   se: boolean;
   level: number;
   hash: string;
-  result?: LeafNode;
 };
+
+type Quadrant = keyof Quadrants<Node>;
+const QUADRANTS = ["nw", "ne", "sw", "se"] as const satisfies Quadrant[];
 
 export function createNode(quadrants: Quadrants<Node>): Node {
   const { nw, ne, sw, se } = quadrants;
@@ -34,6 +36,19 @@ export function createNode(quadrants: Quadrants<Node>): Node {
     sw,
     se,
     level: nw.level + 1,
+    hash: createHash(quadrants),
+  };
+}
+
+export function createLeafNode(quadrants: Quadrants<boolean>): LeafNode {
+  const { nw, ne, sw, se } = quadrants;
+
+  return {
+    nw,
+    ne,
+    sw,
+    se,
+    level: 0,
     hash: createHash(quadrants),
   };
 }
@@ -49,15 +64,24 @@ export function getCenterNode({ nw, ne, sw, se }: Quadrants<Node>): Node {
   };
 }
 
-export function createHash({ nw, ne, sw, se }: Quadrants<Node>): string {
+export function createHash({
+  nw,
+  ne,
+  sw,
+  se,
+}: Quadrants<Node> | Quadrants<boolean>): string {
+  if (typeof nw === "boolean") {
+    const helper = (val: boolean) => (val ? 1 : 0);
+
+    return `${helper(nw)}${helper(ne)}${helper(sw)}${helper(se)}`;
+  }
+
   return `${nw.hash}${ne.hash}${sw.hash}${se.hash}`;
 }
 
-export function evolve(node: Node): Node;
-export function evolve(node: LeafNode): LeafNode;
-export function evolve(node: Node | LeafNode): Node | LeafNode {
-  if (isLeafNode(node)) {
-    return evolveLeaf(node);
+export function evolve(node: Node): Node {
+  if (node.level === 1) {
+    return processGol(node) as any; // TODO: Not sure how to get around this
   }
 
   // Nodes we'll call evolve on
@@ -155,10 +179,10 @@ export function evolve(node: Node | LeafNode): Node | LeafNode {
 
   // This is the center node of the original node but evolved
   const result = createNode({
-    nw: evolve(nw),
-    ne: evolve(ne),
-    sw: evolve(sw),
-    se: evolve(se),
+    nw: getCenterNode(nw),
+    ne: getCenterNode(ne),
+    sw: getCenterNode(sw),
+    se: getCenterNode(se),
   });
 
   node.result = result;
@@ -166,8 +190,62 @@ export function evolve(node: Node | LeafNode): Node | LeafNode {
   return result;
 }
 
-export function evolveLeaf(node: LeafNode): LeafNode {
-  return node;
+export function processGol(node: Node): LeafNode {
+  const cells: number[][] = [];
+
+  for (let i = 0; i < 4; i++) {
+    const quadrantIndex = QUADRANTS[i];
+    const quadrant = node[quadrantIndex];
+
+    if (!isLeafNode(quadrant)) {
+      throw new Error("Not a leaf node");
+    }
+
+    const yDelta = ["sw", "se"].includes(quadrantIndex) ? 2 : 0;
+    const xDelta = ["ne", "se"].includes(quadrantIndex) ? 2 : 0;
+
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < 2; x++) {
+        const cellQuadrant = QUADRANTS[2 * y + x];
+        cells[y + yDelta][x + xDelta] = (quadrant as LeafNode)[cellQuadrant]
+          ? 1
+          : 0;
+      }
+    }
+  }
+
+  const nextState = [
+    [false, false],
+    [false, false],
+  ];
+
+  for (let y = 1; y < 3; y++) {
+    for (let x = 1; x < 3; x++) {
+      const isAlive = cells[y][x] === 1;
+      const living =
+        cells[y - 1][x - 1] +
+        cells[y - 1][x] +
+        cells[y - 1][x + 1] +
+        cells[y][x - 1] +
+        cells[y][x + 1] +
+        cells[y + 1][x - 1] +
+        cells[y + 1][x] +
+        cells[y + 1][x + 1];
+
+      nextState[y - 1][x - 1] = living === 3 || (isAlive && living === 2);
+    }
+  }
+
+  const result = createLeafNode({
+    nw: nextState[0][0],
+    ne: nextState[0][1],
+    sw: nextState[1][0],
+    se: nextState[1][1],
+  });
+
+  node.result = result;
+
+  return result;
 }
 
 export function isLeafNode(node: Node | LeafNode): node is LeafNode {
