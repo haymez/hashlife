@@ -1,122 +1,175 @@
-type Quadrants<T> = { nw: T; ne: T; sw: T; se: T };
+export type Quadrants<T> = {
+  nw: T;
+  ne: T;
+  sw: T;
+  se: T;
+};
 
-abstract class BaseNode<Data> {
-  nw: Data;
-  ne: Data;
-  sw: Data;
-  se: Data;
+export type Node = {
+  nw: Node;
+  ne: Node;
+  sw: Node;
+  se: Node;
   level: number;
   hash: string;
-  result?: BaseNode<Data>;
-  constructor(level: number, hash: string, quadrants: Quadrants<Data>) {
-    this.level = level;
-    this.hash = hash;
-    this.nw = quadrants.nw;
-    this.ne = quadrants.ne;
-    this.sw = quadrants.sw;
-    this.se = quadrants.se;
-  }
+  result?: Node;
+};
+
+export type LeafNode = {
+  nw: boolean;
+  ne: boolean;
+  sw: boolean;
+  se: boolean;
+  level: number;
+  hash: string;
+  result?: LeafNode;
+};
+
+export function createNode(quadrants: Quadrants<Node>): Node {
+  const { nw, ne, sw, se } = quadrants;
+
+  return {
+    nw,
+    ne,
+    sw,
+    se,
+    level: nw.level + 1,
+    hash: createHash(quadrants),
+  };
 }
 
-class HashNode extends BaseNode<HashNode> {
-  constructor(quadrants: Quadrants<HashNode>) {
-    super(quadrants.nw.level + 1, hashKey(quadrants), quadrants);
-  }
+export function getCenterNode({ nw, ne, sw, se }: Quadrants<Node>): Node {
+  return {
+    nw: nw.se,
+    ne: ne.sw,
+    sw: sw.ne,
+    se: se.nw,
+    level: nw.level,
+    hash: createHash({ nw, ne, sw, se }),
+  };
 }
 
-class HashLeaf extends BaseNode<boolean> {
-  constructor(quadrants: Quadrants<boolean>) {
-    super(0, hashKey(quadrants), quadrants);
-  }
+export function createHash({ nw, ne, sw, se }: Quadrants<Node>): string {
+  return `${nw.hash}${ne.hash}${sw.hash}${se.hash}`;
 }
 
-function hashKey(q: Quadrants<HashNode> | Quadrants<boolean>) {
-  if (typeof q.nw === "boolean") {
-    return [q.nw, q.ne, q.sw, q.se].map((v) => (v ? "1" : "0")).join("");
+export function evolve(node: Node): Node;
+export function evolve(node: LeafNode): LeafNode;
+export function evolve(node: Node | LeafNode): Node | LeafNode {
+  if (isLeafNode(node)) {
+    return evolveLeaf(node);
   }
 
-  return [q.nw.hash, q.ne.hash, q.sw.hash, q.se.hash].join("-");
+  // Nodes we'll call evolve on
+  const n00 = createNode({
+    nw: node.nw.nw,
+    ne: node.nw.ne,
+    sw: node.nw.sw,
+    se: node.nw.se,
+  });
+  const n01 = createNode({
+    nw: node.nw.ne,
+    ne: node.ne.nw,
+    sw: node.nw.se,
+    se: node.ne.sw,
+  });
+  const n02 = createNode({
+    nw: node.ne.nw,
+    ne: node.ne.ne,
+    sw: node.ne.sw,
+    se: node.ne.se,
+  });
+  const n10 = createNode({
+    nw: node.nw.sw,
+    ne: node.nw.se,
+    sw: node.sw.nw,
+    se: node.sw.ne,
+  });
+  const n11 = createNode({
+    nw: node.nw.se,
+    ne: node.ne.sw,
+    sw: node.sw.ne,
+    se: node.se.nw,
+  });
+  const n12 = createNode({
+    nw: node.ne.sw,
+    ne: node.ne.se,
+    sw: node.se.nw,
+    se: node.se.ne,
+  });
+  const n20 = createNode({
+    nw: node.sw.nw,
+    ne: node.sw.ne,
+    sw: node.sw.sw,
+    se: node.sw.se,
+  });
+  const n21 = createNode({
+    nw: node.sw.ne,
+    ne: node.se.nw,
+    sw: node.sw.se,
+    se: node.se.sw,
+  });
+  const n22 = createNode({
+    nw: node.se.nw,
+    ne: node.se.ne,
+    sw: node.se.sw,
+    se: node.se.se,
+  });
+
+  // Calling evolve (this returns the center nodes of values above)
+  const n00Evolved = evolve(n00);
+  const n01Evolved = evolve(n01);
+  const n02Evolved = evolve(n02);
+  const n10Evolved = evolve(n10);
+  const n11Evolved = evolve(n11);
+  const n12Evolved = evolve(n12);
+  const n20Evolved = evolve(n20);
+  const n21Evolved = evolve(n21);
+  const n22Evolved = evolve(n22);
+
+  // These are to help construct central evolved node of original `node`
+  const nw = createNode({
+    nw: n00Evolved,
+    ne: n01Evolved,
+    sw: n10Evolved,
+    se: n11Evolved,
+  });
+  const ne = createNode({
+    nw: n01Evolved,
+    ne: n02Evolved,
+    sw: n11Evolved,
+    se: n12Evolved,
+  });
+  const sw = createNode({
+    nw: n10Evolved,
+    ne: n11Evolved,
+    sw: n20Evolved,
+    se: n21Evolved,
+  });
+  const se = createNode({
+    nw: n11Evolved,
+    ne: n12Evolved,
+    sw: n21Evolved,
+    se: n22Evolved,
+  });
+
+  // This is the center node of the original node but evolved
+  const result = createNode({
+    nw: evolve(nw),
+    ne: evolve(ne),
+    sw: evolve(sw),
+    se: evolve(se),
+  });
+
+  node.result = result;
+
+  return result;
 }
 
-export class World {
-  nodeCache = new Map<string, HashNode | HashLeaf>();
+export function evolveLeaf(node: LeafNode): LeafNode {
+  return node;
+}
 
-  createLeaf(q: Quadrants<boolean>): HashLeaf {
-    const key = hashKey(q);
-    if (this.nodeCache.has(key)) return this.nodeCache.get(key) as HashLeaf;
-    const leaf = new HashLeaf(q);
-    this.nodeCache.set(key, leaf);
-
-    return leaf;
-  }
-
-  createNode(q: Quadrants<HashNode>): HashNode {
-    const key = hashKey(q);
-    if (this.nodeCache.has(key)) return this.nodeCache.get(key) as HashNode;
-    const node = new HashNode(q);
-    this.nodeCache.set(key, node);
-
-    return node;
-  }
-
-  evolve(node: HashNode | HashLeaf): HashNode | HashLeaf {
-    if (node instanceof HashLeaf) return this.evolveLeaf(node);
-    if (node.result) return node.result;
-
-    const { nw, ne, sw, se } = node as HashNode;
-
-    // recurse
-    const a = this.createNode({ nw: nw.nw, ne: nw.ne, sw: nw.sw, se: nw.se });
-    const b = this.createNode({ nw: ne.nw, ne: ne.ne, sw: ne.sw, se: ne.se });
-    const c = this.createNode({ nw: sw.nw, ne: sw.ne, sw: sw.sw, se: sw.se });
-    const d = this.createNode({ nw: se.nw, ne: se.ne, sw: se.sw, se: se.se });
-
-    const result = this.createNode({
-      nw: this.evolve(a) as HashNode,
-      ne: this.evolve(b) as HashNode,
-      sw: this.evolve(c) as HashNode,
-      se: this.evolve(d) as HashNode,
-    });
-
-    node.result = result;
-    return result;
-  }
-
-  evolveLeaf(node: HashLeaf): HashLeaf {
-    const cells = [
-      [0, 0, 0, 0],
-      [0, node.nw ? 1 : 0, node.ne ? 1 : 0, 0],
-      [0, node.sw ? 1 : 0, node.se ? 1 : 0, 0],
-      [0, 0, 0, 0],
-    ];
-
-    const next = [
-      [false, false],
-      [false, false],
-    ];
-
-    for (let y = 1; y <= 2; y++) {
-      for (let x = 1; x <= 2; x++) {
-        const n =
-          cells[y - 1][x - 1] +
-          cells[y - 1][x] +
-          cells[y - 1][x + 1] +
-          cells[y][x - 1] +
-          cells[y][x + 1] +
-          cells[y + 1][x - 1] +
-          cells[y + 1][x] +
-          cells[y + 1][x + 1];
-        const alive = cells[y][x] === 1;
-        const nextState = n === 3 || (alive && n === 2);
-        next[y - 1][x - 1] = nextState;
-      }
-    }
-
-    return this.createLeaf({
-      nw: next[0][0],
-      ne: next[0][1],
-      sw: next[1][0],
-      se: next[1][1],
-    });
-  }
+export function isLeafNode(node: Node | LeafNode): node is LeafNode {
+  return typeof node.nw === "boolean";
 }
