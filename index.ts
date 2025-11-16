@@ -5,39 +5,39 @@ export type Quadrants<T> = {
   se: T;
 };
 
-export type Node = {
-  nw: Node;
-  ne: Node;
-  sw: Node;
-  se: Node;
+interface BaseNode<T> extends Quadrants<T> {
   level: number;
   hash: string;
-  result?: Node | LeafNode;
+}
+
+export interface Node extends BaseNode<Node> {
+  result?: Node;
+}
+
+export type LeafNode = BaseNode<boolean>;
+
+export type AlmostLeafNode = BaseNode<LeafNode> & {
+  result?: LeafNode;
 };
 
-export type LeafNode = {
-  nw: boolean;
-  ne: boolean;
-  sw: boolean;
-  se: boolean;
-  level: number;
-  hash: string;
-};
+type AnyNodeQuadrants =
+  | Quadrants<Node>
+  | Quadrants<AlmostLeafNode>
+  | Quadrants<LeafNode>
+  | Quadrants<boolean>;
 
-type Quadrant = keyof Quadrants<Node>;
-const QUADRANTS = ["nw", "ne", "sw", "se"] as const satisfies Quadrant[];
+type AnyNode = Node | AlmostLeafNode | LeafNode;
 
-export function createNode(quadrants: Quadrants<Node>): Node {
-  const { nw, ne, sw, se } = quadrants;
-
+export function createNode(quadrants: Quadrants<boolean>): LeafNode;
+export function createNode(quadrants: Quadrants<LeafNode>): AlmostLeafNode;
+export function createNode(quadrants: Quadrants<AlmostLeafNode>): Node;
+export function createNode(quadrants: Quadrants<Node>): Node;
+export function createNode(quadrants: AnyNodeQuadrants): AnyNode {
   return {
-    nw,
-    ne,
-    sw,
-    se,
-    level: nw.level + 1,
+    ...quadrants,
+    level: typeof quadrants.nw === "boolean" ? 0 : quadrants.nw.level + 1,
     hash: createHash(quadrants),
-  };
+  } as AnyNode;
 }
 
 export function createLeafNode(quadrants: Quadrants<boolean>): LeafNode {
@@ -53,23 +53,26 @@ export function createLeafNode(quadrants: Quadrants<boolean>): LeafNode {
   };
 }
 
-export function getCenterNode({ nw, ne, sw, se }: Quadrants<Node>): Node {
-  return {
-    nw: nw.se,
-    ne: ne.sw,
-    sw: sw.ne,
-    se: se.nw,
-    level: nw.level,
-    hash: createHash({ nw, ne, sw, se }),
-  };
-}
-
-export function createHash({
+export function getCenterNode({ nw, ne, sw, se }: Node): Node;
+export function getCenterNode({ nw, ne, sw, se }: AlmostLeafNode): LeafNode;
+export function getCenterNode({
   nw,
   ne,
   sw,
   se,
-}: Quadrants<Node> | Quadrants<boolean>): string {
+}: Node | AlmostLeafNode): Node | AlmostLeafNode | LeafNode {
+  const quadrants = { nw: nw.se, ne: ne.sw, sw: sw.ne, se: se.nw } as
+    | Quadrants<Node>
+    | Quadrants<AlmostLeafNode>;
+
+  return {
+    ...quadrants,
+    level: nw.level,
+    hash: createHash(quadrants),
+  } as Node | AlmostLeafNode | LeafNode;
+}
+
+export function createHash({ nw, ne, sw, se }: AnyNodeQuadrants): string {
   if (typeof nw === "boolean") {
     const helper = (val: boolean) => (val ? 1 : 0);
 
@@ -79,9 +82,11 @@ export function createHash({
   return `${nw.hash}${ne.hash}${sw.hash}${se.hash}`;
 }
 
-export function evolve(node: Node): Node {
-  if (node.level === 1) {
-    return processGol(node) as any; // TODO: Not sure how to get around this
+export function evolve(node: Node): Node;
+export function evolve(node: AlmostLeafNode): LeafNode;
+export function evolve(node: Node | AlmostLeafNode): Node | LeafNode {
+  if (isAlmostLeafNode(node)) {
+    return processGol(node);
   }
 
   // Nodes we'll call evolve on
@@ -190,29 +195,19 @@ export function evolve(node: Node): Node {
   return result;
 }
 
-export function processGol(node: Node): LeafNode {
-  const cells: number[][] = [];
-
-  for (let i = 0; i < 4; i++) {
-    const quadrantIndex = QUADRANTS[i];
-    const quadrant = node[quadrantIndex];
-
-    if (!isLeafNode(quadrant)) {
-      throw new Error("Not a leaf node");
-    }
-
-    const yDelta = ["sw", "se"].includes(quadrantIndex) ? 2 : 0;
-    const xDelta = ["ne", "se"].includes(quadrantIndex) ? 2 : 0;
-
-    for (let y = 0; y < 2; y++) {
-      for (let x = 0; x < 2; x++) {
-        const cellQuadrant = QUADRANTS[2 * y + x];
-        cells[y + yDelta][x + xDelta] = (quadrant as LeafNode)[cellQuadrant]
-          ? 1
-          : 0;
-      }
-    }
-  }
+export function processGol(node: AlmostLeafNode): LeafNode {
+  // /**
+  //  * 0000
+  //  * 0000
+  //  * 0000
+  //  * 0000
+  //  */
+  const cells = [
+    [node.nw.nw, node.nw.ne, node.ne.nw, node.ne.ne],
+    [node.nw.sw, node.nw.se, node.ne.sw, node.ne.se],
+    [node.sw.nw, node.sw.ne, node.se.nw, node.se.ne],
+    [node.sw.sw, node.sw.se, node.se.sw, node.se.se],
+  ].map((arr) => arr.map((i) => (i ? 1 : 0)));
 
   const nextState = [
     [false, false],
@@ -248,6 +243,6 @@ export function processGol(node: Node): LeafNode {
   return result;
 }
 
-export function isLeafNode(node: Node | LeafNode): node is LeafNode {
-  return typeof node.nw === "boolean";
+function isAlmostLeafNode(node: Node | AlmostLeafNode): node is AlmostLeafNode {
+  return typeof node.nw.nw === "boolean";
 }
