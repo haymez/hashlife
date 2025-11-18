@@ -72,6 +72,69 @@ export function getCenterNode({
   } as Node | AlmostLeafNode | LeafNode;
 }
 
+export function createDeadDuplicateFor(val: boolean): boolean;
+export function createDeadDuplicateFor(val: LeafNode): LeafNode;
+export function createDeadDuplicateFor(val: AlmostLeafNode): AlmostLeafNode;
+export function createDeadDuplicateFor(val: Node): Node;
+export function createDeadDuplicateFor(
+  val: AnyNode | boolean
+): AnyNode | boolean {
+  if (typeof val === "boolean") return false;
+
+  const depth = val.level;
+  let newNode: any = createLeafNode({
+    nw: false,
+    ne: false,
+    sw: false,
+    se: false,
+  });
+
+  for (let i = 0; i < depth; i++) {
+    newNode = createNode({
+      nw: newNode,
+      ne: newNode,
+      sw: newNode,
+      se: newNode,
+    });
+  }
+
+  return newNode;
+}
+
+export function addBorder(ndoe: LeafNode): AlmostLeafNode;
+export function addBorder(ndoe: AlmostLeafNode): Node;
+export function addBorder(ndoe: Node): Node;
+export function addBorder(node: any): AlmostLeafNode | Node {
+  const emptyNode = createDeadDuplicateFor(node.nw);
+
+  const nw = createNode({
+    nw: emptyNode,
+    ne: emptyNode,
+    sw: emptyNode,
+    se: node.nw,
+  });
+  const ne = createNode({
+    nw: emptyNode,
+    ne: emptyNode,
+    sw: node.ne,
+    se: emptyNode,
+  });
+  const sw = createNode({
+    nw: emptyNode,
+    ne: node.sw,
+    sw: emptyNode,
+    se: emptyNode,
+  });
+  const se = createNode({
+    nw: node.se,
+    ne: emptyNode,
+    sw: emptyNode,
+    se: emptyNode,
+  });
+
+  return createNode({ nw, ne, sw, se });
+}
+
 export function createHash({ nw, ne, sw, se }: AnyNodeQuadrants): string {
   if (typeof nw === "boolean") {
     const helper = (val: boolean) => (val ? 1 : 0);
@@ -85,6 +148,8 @@ export function createHash({ nw, ne, sw, se }: AnyNodeQuadrants): string {
 export function evolve(node: Node): Node;
 export function evolve(node: AlmostLeafNode): LeafNode;
 export function evolve(node: Node | AlmostLeafNode): Node | LeafNode {
+  if (node.result) return node.result;
+
   if (isAlmostLeafNode(node)) {
     return processGol(node);
   }
@@ -245,4 +310,39 @@ export function processGol(node: AlmostLeafNode): LeafNode {
 
 function isAlmostLeafNode(node: Node | AlmostLeafNode): node is AlmostLeafNode {
   return typeof node.nw.nw === "boolean";
+}
+
+export class World {
+  cache = new Map<string, AnyNode>();
+  root: Node;
+
+  constructor() {
+    this.root = createLeafNode({
+      nw: false,
+      ne: false,
+      sw: false,
+      se: false,
+    }) as any;
+  }
+
+  createNode(quadrants: Quadrants<boolean>): LeafNode;
+  createNode(quadrants: Quadrants<LeafNode>): AlmostLeafNode;
+  createNode(quadrants: Quadrants<AlmostLeafNode>): Node;
+  createNode(quadrants: Quadrants<Node>): Node;
+  createNode(quadrants: any): any {
+    const hash = createHash(quadrants);
+
+    if (this.cache.has(hash)) {
+      return this.cache.get(hash)!;
+    }
+
+    const node = createNode(quadrants);
+    this.cache.set(hash, node);
+
+    return node;
+  }
+
+  nextGen() {
+    this.root = createNode(addBorder(this.root));
+  }
 }
