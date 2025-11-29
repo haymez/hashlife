@@ -1,5 +1,7 @@
 # hashlife
 
+Hashlife implementation written in Typescript
+
 To install dependencies:
 
 ```bash
