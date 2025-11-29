@@ -89,7 +89,7 @@ describe("getCenterNode", () => {
     const ne = world.createLeafNode({
       nw: false,
       ne: false,
-      sw: false,
+      sw: true,
       se: false,
     });
     const sw = world.createLeafNode({
@@ -99,7 +99,7 @@ describe("getCenterNode", () => {
       se: true,
     });
     const se = world.createLeafNode({
-      nw: false,
+      nw: true,
       ne: false,
       sw: false,
       se: false,
@@ -107,56 +107,56 @@ describe("getCenterNode", () => {
 
     /**
      * 0000
-     * 0100
-     * 0100
-     * 0100
+     * 0110
+     * 0110
+     * 0000
      */
-    const newNode = world.createNode({ nw, ne, sw, se });
+    const node = world.createNode({ nw, ne, sw, se });
 
-    expect(getCenterNode(newNode)).toEqual({
+    expect(getCenterNode(node)).toEqual({
       nw: true,
-      ne: false,
+      ne: true,
       sw: true,
-      se: false,
+      se: true,
       level: 0,
-      hash: "1010",
+      hash: "1111",
     });
   });
 });
 
 describe("createDeadDuplicateFor", () => {
-  test("should create a duplicate node where all leaf values are values", () => {
+  test("should create a duplicate node where all leaf values are false", () => {
     const world = new World();
     const nw = world.createLeafNode({
-      nw: false,
-      ne: false,
-      sw: false,
+      nw: true,
+      ne: true,
+      sw: true,
       se: true,
     });
     const ne = world.createLeafNode({
-      nw: false,
-      ne: false,
-      sw: false,
-      se: false,
+      nw: true,
+      ne: true,
+      sw: true,
+      se: true,
     });
     const sw = world.createLeafNode({
-      nw: false,
+      nw: true,
       ne: true,
-      sw: false,
+      sw: true,
       se: true,
     });
     const se = world.createLeafNode({
-      nw: false,
-      ne: false,
-      sw: false,
-      se: false,
+      nw: true,
+      ne: true,
+      sw: true,
+      se: true,
     });
 
     /**
-     * 0000
-     * 0100
-     * 0100
-     * 0100
+     * 1111
+     * 1111
+     * 1111
+     * 1111
      */
     const newNode = world.createNode({ nw, ne, sw, se });
 
@@ -440,6 +440,17 @@ describe("evolve", () => {
         se: false,
       }),
     });
+
+    /**
+     * 00000000
+     * 00000000
+     * 00010000
+     * 00010000
+     * 00010000
+     * 00000000
+     * 00000000
+     * 00000000
+     */
     const node = world.createNode({ nw, ne, sw, se });
     const generatedNode: AlmostLeafNode = {
       nw: {
@@ -479,5 +490,57 @@ describe("evolve", () => {
     };
 
     expect(world.evolve(node)).toEqual(generatedNode as any);
+  });
+});
+
+describe("nextGen", () => {
+  test("should properly set next generation of world", () => {
+    const world = new World();
+    const node = world.createNode({
+      nw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: true,
+      }),
+      ne: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      sw: world.createLeafNode({
+        nw: false,
+        ne: true,
+        sw: false,
+        se: true,
+      }),
+      se: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+    });
+    world.root = node as any;
+    const emptyLeaf = world.createLeafNode({
+      nw: false,
+      ne: false,
+      sw: false,
+      se: false,
+    });
+    const nextGen = world.addBorder(
+      world.createNode({
+        nw: emptyLeaf,
+        ne: emptyLeaf,
+        sw: world.createLeafNode({ nw: true, ne: true, sw: false, se: false }),
+        se: world.createLeafNode({ nw: true, ne: false, sw: false, se: false }),
+      })
+    );
+
+    world.nextGen();
+
+    expect(world.root.level).toEqual(2);
+    expect(world.root).toEqual(nextGen);
   });
 });

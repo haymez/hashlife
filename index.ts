@@ -75,12 +75,13 @@ export class World {
   }
 
   nextGen() {
-    this.root = this.createNode(this.addBorder(this.evolve(this.root)));
+    const newNode = this.addBorder(this.addBorder(this.root));
+    this.root = this.evolve(newNode);
   }
 
-  evolve(node: Node): Node;
-  evolve(node: AlmostLeafNode): LeafNode;
-  evolve(node: Node | AlmostLeafNode): Node | LeafNode {
+  evolve(node: Node, fastSpeed?: boolean): Node;
+  evolve(node: AlmostLeafNode, fastSpeed?: boolean): LeafNode;
+  evolve(node: Node | AlmostLeafNode, fastSpeed = false): Node | LeafNode {
     if (node.result) return node.result;
 
     if (isAlmostLeafNode(node)) {
@@ -88,24 +89,14 @@ export class World {
     }
 
     // Nodes we'll call evolve on
-    const n00 = this.createNode({
-      nw: node.nw.nw,
-      ne: node.nw.ne,
-      sw: node.nw.sw,
-      se: node.nw.se,
-    });
+    const n00 = this.createNode(node.nw);
     const n01 = this.createNode({
       nw: node.nw.ne,
       ne: node.ne.nw,
       sw: node.nw.se,
       se: node.ne.sw,
     });
-    const n02 = this.createNode({
-      nw: node.ne.nw,
-      ne: node.ne.ne,
-      sw: node.ne.sw,
-      se: node.ne.se,
-    });
+    const n02 = this.createNode(node.ne);
     const n10 = this.createNode({
       nw: node.nw.sw,
       ne: node.nw.se,
@@ -124,24 +115,14 @@ export class World {
       sw: node.se.nw,
       se: node.se.ne,
     });
-    const n20 = this.createNode({
-      nw: node.sw.nw,
-      ne: node.sw.ne,
-      sw: node.sw.sw,
-      se: node.sw.se,
-    });
+    const n20 = this.createNode(node.sw);
     const n21 = this.createNode({
       nw: node.sw.ne,
       ne: node.se.nw,
       sw: node.sw.se,
       se: node.se.sw,
     });
-    const n22 = this.createNode({
-      nw: node.se.nw,
-      ne: node.se.ne,
-      sw: node.se.sw,
-      se: node.se.se,
-    });
+    const n22 = this.createNode(node.se);
 
     // Calling evolve (this returns the center nodes of values above)
     const n00Evolved = this.evolve(n00);
@@ -181,12 +162,19 @@ export class World {
     });
 
     // This is the center node of the original node but evolved
-    const result = this.createNode({
-      nw: getCenterNode(nw),
-      ne: getCenterNode(ne),
-      sw: getCenterNode(sw),
-      se: getCenterNode(se),
-    });
+    const result = fastSpeed
+      ? this.createNode({
+          nw: this.evolve(nw),
+          ne: this.evolve(ne),
+          sw: this.evolve(sw),
+          se: this.evolve(se),
+        })
+      : this.createNode({
+          nw: getCenterNode(nw),
+          ne: getCenterNode(ne),
+          sw: getCenterNode(sw),
+          se: getCenterNode(se),
+        });
 
     node.result = result;
 
@@ -207,7 +195,7 @@ export class World {
     const node = {
       ...quadrants,
       level: typeof quadrants.nw === "boolean" ? 0 : quadrants.nw.level + 1,
-      hash: createHash(quadrants),
+      hash,
     } as AnyNode;
 
     this.cache.set(hash, node);
