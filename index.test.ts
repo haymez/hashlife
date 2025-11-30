@@ -496,6 +496,12 @@ describe("evolve", () => {
 describe("nextGen", () => {
   test("should properly set next generation of world", () => {
     const world = new World();
+    /**
+     * 0000
+     * 0100
+     * 0100
+     * 0100
+     */
     const node = world.createNode({
       nw: world.createLeafNode({
         nw: false,
@@ -529,6 +535,16 @@ describe("nextGen", () => {
       sw: false,
       se: false,
     });
+    /**
+     * 00000000
+     * 00000000
+     * 00000000
+     * 00000000
+     * 00111000
+     * 00000000
+     * 00000000
+     * 00000000
+     */
     const nextGen = world.addBorder(
       world.createNode({
         nw: emptyLeaf,
