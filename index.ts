@@ -74,9 +74,55 @@ export class World {
     }) as any;
   }
 
+  hasLivingCellOnEdge(node: Node): boolean {
+    const { hash, level } = node;
+    const side = 2 ** level;
+    const totalNodes = side * side;
+    const totalCellsInLeaf = 4;
+
+    // Top row
+    for (let i = 0; i < side; i++) {
+      const index = i * totalCellsInLeaf;
+
+      if (hash[index] === "1" || hash[index + 1] === "1") {
+        console.log(`************* ${hash} - ${index} ****************`);
+        return true;
+      }
+    }
+
+    // Bottom row
+    for (let i = totalNodes - side; i < totalNodes; i++) {
+      const index = i * totalCellsInLeaf + 2;
+
+      if (hash[index] === "1" || hash[index + 1] === "1") {
+        return true;
+      }
+    }
+
+    // Left and right columns
+    for (let row = 0; row < side; row++) {
+      const left = row * side * totalCellsInLeaf;
+      const right = left + (side - 1) * totalCellsInLeaf + 1;
+
+      if (
+        hash[left] === "1" ||
+        hash[left + 2] === "1" ||
+        hash[right] === "1" ||
+        hash[right + 2] === "1"
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   nextGen() {
-    const newNode = this.addBorder(this.addBorder(this.root));
-    this.root = this.evolve(newNode);
+    if (this.hasLivingCellOnEdge(this.root)) {
+      this.root = this.addBorder(this.root);
+    }
+
+    this.root = this.evolve(this.addBorder(this.root));
   }
 
   evolve(node: Node, fastSpeed?: boolean): Node;
@@ -331,5 +377,16 @@ export class World {
     }
 
     return newNode;
+  }
+
+  printNode(node: Node): string {
+    const rows: string[] = [];
+    const sideLength = Math.pow(2, node.level + 1);
+
+    for (let i = 0; i < sideLength; i++) {
+      rows.push(node.hash.slice(i * sideLength, (i + 1) * sideLength));
+    }
+
+    return rows.join("\n");
   }
 }

@@ -1,6 +1,12 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import * as Hashlife from ".";
-import { createHash, getCenterNode, World, type AlmostLeafNode } from ".";
+import {
+  createHash,
+  getCenterNode,
+  World,
+  type AlmostLeafNode,
+  type Node,
+} from ".";
 
 describe("createLeafNode", () => {
   test("should create leaf node with proper values", () => {
@@ -113,6 +119,7 @@ describe("getCenterNode", () => {
      */
     const node = world.createNode({ nw, ne, sw, se });
 
+    expect(node.level).toEqual(1);
     expect(getCenterNode(node)).toEqual({
       nw: true,
       ne: true,
@@ -229,38 +236,30 @@ describe("addBorder", () => {
     });
 
     expect(world.addBorder(leafNode)).toEqual({
-      nw: {
+      nw: world.createLeafNode({
         nw: false,
         ne: false,
         sw: false,
         se: true,
-        level: 0,
-        hash: "0001",
-      },
-      ne: {
+      }),
+      ne: world.createLeafNode({
         nw: false,
         ne: false,
         sw: true,
         se: false,
-        level: 0,
-        hash: "0010",
-      },
-      sw: {
+      }),
+      sw: world.createLeafNode({
         nw: false,
         ne: true,
         sw: false,
         se: false,
-        level: 0,
-        hash: "0100",
-      },
-      se: {
+      }),
+      se: world.createLeafNode({
         nw: true,
         ne: false,
         sw: false,
         se: false,
-        level: 0,
-        hash: "1000",
-      },
+      }),
       level: 1,
       hash: "0001001001001000",
     });
@@ -493,21 +492,35 @@ describe("evolve", () => {
   });
 });
 
-describe("nextGen", () => {
-  test("should properly set next generation of world", () => {
+describe("printNode", () => {
+  test("should print leaf node", () => {
+    const world = new World();
+    const node = world.createLeafNode({
+      nw: false,
+      ne: true,
+      sw: false,
+      se: true,
+    });
+
+    expect(world.printNode(node as any)).toBe("01\n01");
+  });
+});
+
+describe("hasLivingCellOnEdge", () => {
+  test("should return false when no cells on the edge are true", () => {
     const world = new World();
     /**
      * 0000
-     * 0100
-     * 0100
-     * 0100
+     * 0110
+     * 0110
+     * 0000
      */
     const node = world.createNode({
       nw: world.createLeafNode({
         nw: false,
         ne: false,
         sw: false,
-        se: true,
+        se: false,
       }),
       ne: world.createLeafNode({
         nw: false,
@@ -517,7 +530,289 @@ describe("nextGen", () => {
       }),
       sw: world.createLeafNode({
         nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      se: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+    });
+
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(false);
+  });
+
+  test("should return false when no cells on the edge are true test 2", () => {
+    const world = new World();
+    const node = world.createNode({
+      nw: world.createNode({
+        nw: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: true,
+        }) as any,
+        ne: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: true,
+          se: true,
+        }) as any,
+        sw: world.createLeafNode({
+          nw: false,
+          ne: true,
+          sw: false,
+          se: true,
+        }) as any,
+        se: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+      }) as any,
+      ne: world.createNode({
+        nw: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: true,
+          se: false,
+        }) as any,
+        ne: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        sw: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        se: world.createLeafNode({
+          nw: true,
+          ne: false,
+          sw: true,
+          se: false,
+        }) as any,
+      }) as any,
+      /**
+       * 00000000
+       * 01111110
+       * 01111110
+       * 01111110
+       * 01111110
+       * 01111110
+       * 01111110
+       * 00000000
+       */
+      sw: world.createNode({
+        nw: world.createLeafNode({
+          nw: false,
+          ne: true,
+          sw: false,
+          se: true,
+        }) as any,
+        ne: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        sw: world.createLeafNode({
+          nw: false,
+          ne: true,
+          sw: false,
+          se: false,
+        }) as any,
+        se: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+      }) as any,
+      se: world.createNode({
+        nw: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        ne: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        sw: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+        se: world.createLeafNode({
+          nw: true,
+          ne: true,
+          sw: true,
+          se: true,
+        }) as any,
+      }) as any,
+    });
+
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(false);
+  });
+
+  test("should return true when a cell on the right edge is true", () => {
+    const world = new World();
+    /**
+     * 0000
+     * 0000
+     * 0001
+     * 0000
+     *
+     * `0000000000000100`
+     */
+    const node = world.createNode({
+      nw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      ne: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      sw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      se: world.createLeafNode({
+        nw: false,
         ne: true,
+        sw: false,
+        se: false,
+      }),
+    });
+
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(true);
+  });
+
+  test("should return true when a cell on the left edge is true", () => {
+    const world = new World();
+    /**
+     * 0000
+     * 1000
+     * 0000
+     * 0000
+     *
+     * `0010000000000000`
+     */
+    const node = world.createNode({
+      nw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: true,
+        se: false,
+      }),
+      ne: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      sw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      se: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+    });
+
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(true);
+  });
+
+  test("should return true when a cell on the top edge is true", () => {
+    const world = new World();
+    /**
+     * 0010
+     * 0000
+     * 0000
+     * 0000
+     *
+     * `0000100000000000`
+     */
+    const node = world.createNode({
+      nw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      ne: world.createLeafNode({
+        nw: true,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      sw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      se: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+    });
+
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(true);
+  });
+
+  test("should return true when a cell on the bottom edge is true", () => {
+    const world = new World();
+    /**
+     * 0000
+     * 0000
+     * 0000
+     * 0100
+     *
+     * `0000000000100000`
+     */
+    const node = world.createNode({
+      nw: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      ne: world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      }),
+      sw: world.createLeafNode({
+        nw: false,
+        ne: false,
         sw: false,
         se: true,
       }),
@@ -528,35 +823,163 @@ describe("nextGen", () => {
         se: false,
       }),
     });
-    world.root = node as any;
-    const emptyLeaf = world.createLeafNode({
-      nw: false,
-      ne: false,
-      sw: false,
-      se: false,
-    });
-    /**
-     * 00000000
-     * 00000000
-     * 00000000
-     * 00000000
-     * 00111000
-     * 00000000
-     * 00000000
-     * 00000000
-     */
-    const nextGen = world.addBorder(
-      world.createNode({
-        nw: emptyLeaf,
-        ne: emptyLeaf,
-        sw: world.createLeafNode({ nw: true, ne: true, sw: false, se: false }),
-        se: world.createLeafNode({ nw: true, ne: false, sw: false, se: false }),
-      })
-    );
 
-    world.nextGen();
-
-    expect(world.root.level).toEqual(2);
-    expect(world.root).toEqual(nextGen);
+    expect(world.hasLivingCellOnEdge(node as any)).toEqual(true);
   });
+
+  test("should return false when larger world has living cells but not on edge", () => {
+    // test.only("should return false when larger world has living cells but not on edge", () => {
+    const world = new World();
+    const l0Node = world.createLeafNode({
+      nw: true,
+      ne: true,
+      sw: true,
+      se: true,
+    });
+    const l1Node = world.createNode({
+      nw: l0Node,
+      ne: l0Node,
+      sw: l0Node,
+      se: l0Node,
+    }) as any as Node;
+
+    const node = world.createNode({
+      nw: l1Node,
+      ne: l1Node,
+      sw: l1Node,
+      se: l1Node,
+    });
+
+    world.root = world.addBorder(node);
+
+    expect(world.root.level).toEqual(3);
+    expect(world.hasLivingCellOnEdge(world.root)).toEqual(false);
+  });
+});
+
+describe("nextGen", () => {
+  describe("when living cells are at edge of world", () => {
+    test("should properly evolve without growing world", () => {
+      const world = new World();
+      /**
+       * 0000
+       * 0100
+       * 0100
+       * 0100
+       */
+      const node = world.createNode({
+        nw: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: true,
+        }),
+        ne: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: false,
+        }),
+        sw: world.createLeafNode({
+          nw: false,
+          ne: true,
+          sw: false,
+          se: true,
+        }),
+        se: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: false,
+        }),
+      });
+      world.root = node as any;
+      const emptyLeaf = world.createLeafNode({
+        nw: false,
+        ne: false,
+        sw: false,
+        se: false,
+      });
+      /**
+       * 00000000
+       * 00000000
+       * 00000000
+       * 00000000
+       * 00111000
+       * 00000000
+       * 00000000
+       * 00000000
+       */
+      const nextGen = world.addBorder(
+        world.createNode({
+          nw: emptyLeaf,
+          ne: emptyLeaf,
+          sw: world.createLeafNode({
+            nw: true,
+            ne: true,
+            sw: false,
+            se: false,
+          }),
+          se: world.createLeafNode({
+            nw: true,
+            ne: false,
+            sw: false,
+            se: false,
+          }),
+        })
+      );
+
+      world.nextGen();
+
+      expect(world.root.level).toEqual(2);
+      expect(world.root).toEqual(nextGen);
+    });
+  });
+
+  describe("when no living cells are at edge of world", () => {
+    test("should properly set next generation of world", () => {
+      const world = new World();
+      /**
+       * 0000
+       * 0100
+       * 0100
+       * 0000
+       */
+      const node = world.createNode({
+        nw: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: true,
+        }),
+        ne: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: false,
+        }),
+        sw: world.createLeafNode({
+          nw: false,
+          ne: true,
+          sw: false,
+          se: false,
+        }),
+        se: world.createLeafNode({
+          nw: false,
+          ne: false,
+          sw: false,
+          se: false,
+        }),
+      });
+      world.root = node as any;
+      const nextGen = world.createDeadDuplicateFor(node);
+
+      world.nextGen();
+
+      expect(world.root.level).toEqual(1);
+      expect(world.root).toEqual(nextGen as any);
+    });
+  });
+
+  describe("when next gen will put cell at edge of world", () => {});
 });
