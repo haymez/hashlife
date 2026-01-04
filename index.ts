@@ -291,26 +291,26 @@ export class World {
 
     for (let y = 1; y < 3; y++) {
       for (let x = 1; x < 3; x++) {
-        const isAlive = cells[y][x] === 1;
+        const isAlive = cells[y]![x]! === 1;
         const living =
-          cells[y - 1][x - 1] +
-          cells[y - 1][x] +
-          cells[y - 1][x + 1] +
-          cells[y][x - 1] +
-          cells[y][x + 1] +
-          cells[y + 1][x - 1] +
-          cells[y + 1][x] +
-          cells[y + 1][x + 1];
+          cells[y - 1]![x - 1]! +
+          cells[y - 1]![x]! +
+          cells[y - 1]![x + 1]! +
+          cells[y]![x - 1]! +
+          cells[y]![x + 1]! +
+          cells[y + 1]![x - 1]! +
+          cells[y + 1]![x]! +
+          cells[y + 1]![x + 1]!;
 
-        nextState[y - 1][x - 1] = living === 3 || (isAlive && living === 2);
+        nextState[y - 1]![x - 1]! = living === 3 || (isAlive && living === 2);
       }
     }
 
     const result = this.createLeafNode({
-      nw: nextState[0][0],
-      ne: nextState[0][1],
-      sw: nextState[1][0],
-      se: nextState[1][1],
+      nw: nextState[0]![0]!,
+      ne: nextState[0]![1]!,
+      sw: nextState[1]![0]!,
+      se: nextState[1]![1]!,
     });
 
     node.result = result;

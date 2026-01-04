@@ -25,7 +25,6 @@
     "noPropertyAccessFromIndexSignature": false,
 
     // Other
-    "composite": true,
-    "declaration": true
+    "noUncheckedIndexedAccess": true
   }
 }
